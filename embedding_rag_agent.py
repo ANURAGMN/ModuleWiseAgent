@@ -271,9 +271,18 @@ class SmartVectorStore:
             chunk['document'] = document_name
             self.chunks.append(chunk)
         
-        # Generate embeddings (documents, not queries)
-        all_texts = [c['text'] for c in self.chunks]
-        embeddings = self.embedding_backend.encode(all_texts, is_query=False)
+        # Generate embeddings only for NEW chunks (not all chunks)
+        new_texts = [chunk['text'] for chunk in chunks]
+        
+        # For TF-IDF, we need to fit on all chunks but only get embeddings for new ones
+        if self.embedding_backend.backend_name == "tfidf":
+            all_texts = [c['text'] for c in self.chunks]
+            # Fit on all, transform new
+            self.embedding_backend.backend.fit(all_texts)
+            embeddings = self.embedding_backend.backend.transform(new_texts).toarray()
+        else:
+            # For neural embeddings, just encode the new texts
+            embeddings = self.embedding_backend.encode(new_texts, is_query=False)
         
         if self.use_chromadb:
             # Use ChromaDB
