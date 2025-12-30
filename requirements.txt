@@ -1,3 +1,4 @@
+# Core RAG dependencies (original implementation)
 groq>=0.4.0
 pymupdf>=1.23.0
 langchain>=0.1.0
@@ -6,3 +7,7 @@ chromadb>=0.4.22
 sentence-transformers>=2.3.0
 tiktoken>=0.5.0
 numpy>=1.24.0
+
+# Lightweight alternative dependencies (TF-IDF agent)
+pdfplumber>=0.10.0
+scikit-learn>=1.3.0
