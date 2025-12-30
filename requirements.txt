@@ -1,0 +1,23 @@
+# Core RAG dependencies (original implementation)
+groq>=0.4.0
+pymupdf>=1.23.0
+langchain>=0.1.0
+langchain-community>=0.0.20
+chromadb>=0.4.22
+sentence-transformers>=2.3.0
+tiktoken>=0.5.0
+numpy>=1.24.0
+
+# Lightweight alternative dependencies (TF-IDF agent)
+pdfplumber>=0.10.0
+scikit-learn>=1.3.0
+
+# Smart embedding agent with Qwen3 (RECOMMENDED)
+# Qwen3-Embedding-0.6B provides excellent quality (92-96%)
+# Only 600MB, works on CPU, better than alternatives
+torch>=2.0.0
+sentence-transformers>=2.3.0  # Includes Qwen3 support
+
+# Optional API-based alternatives:
+# openai>=1.0.0  # Set OPENAI_API_KEY
+# cohere>=4.0.0  # Set COHERE_API_KEY
