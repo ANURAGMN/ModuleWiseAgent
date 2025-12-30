@@ -11,3 +11,8 @@ numpy>=1.24.0
 # Lightweight alternative dependencies (TF-IDF agent)
 pdfplumber>=0.10.0
 scikit-learn>=1.3.0
+
+# Smart embedding agent (tries multiple backends)
+# Install sentence-transformers for best quality, OR
+# Set OPENAI_API_KEY for API-based embeddings, OR
+# Falls back to TF-IDF automatically
