@@ -37,18 +37,34 @@ class EmbeddingBackend:
     def _initialize_backend(self):
         """Try different embedding backends in order of preference."""
         
-        # Try 1: sentence-transformers (best quality)
+        # Try 1: Qwen3 embeddings (best quality, small size)
         try:
             from sentence_transformers import SentenceTransformer
-            print("🔍 Trying sentence-transformers...")
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"🔍 Trying Qwen3-Embedding-0.6B (device: {device})...")
+            self.backend = SentenceTransformer(
+                "Qwen/Qwen3-Embedding-0.6B",
+                device=device
+            )
+            self.backend_name = "qwen3"
+            print(f"✅ Using Qwen3 Embeddings (Excellent Quality, {device.upper()})")
+            return
+        except Exception as e:
+            print(f"⚠️  Qwen3 not available: {str(e)[:50]}...")
+        
+        # Try 2: Standard sentence-transformers (fallback)
+        try:
+            from sentence_transformers import SentenceTransformer
+            print("🔍 Trying all-MiniLM-L6-v2...")
             self.backend = SentenceTransformer('all-MiniLM-L6-v2')
             self.backend_name = "sentence-transformers"
-            print("✅ Using sentence-transformers (Best Quality)")
+            print("✅ Using sentence-transformers (Good Quality)")
             return
         except Exception as e:
             print(f"⚠️  sentence-transformers not available: {str(e)[:50]}...")
         
-        # Try 2: OpenAI embeddings (requires API key)
+        # Try 3: OpenAI embeddings (requires API key)
         try:
             from openai import OpenAI
             openai_key = os.getenv("OPENAI_API_KEY")
@@ -61,7 +77,7 @@ class EmbeddingBackend:
         except Exception as e:
             print(f"⚠️  OpenAI not available: {str(e)[:50]}...")
         
-        # Try 3: Cohere embeddings (alternative API)
+        # Try 4: Cohere embeddings (alternative API)
         try:
             import cohere
             cohere_key = os.getenv("COHERE_API_KEY")
@@ -74,7 +90,7 @@ class EmbeddingBackend:
         except Exception as e:
             print(f"⚠️  Cohere not available: {str(e)[:50]}...")
         
-        # Try 4: TF-IDF fallback (always works)
+        # Try 5: TF-IDF fallback (always works)
         try:
             from sklearn.feature_extraction.text import TfidfVectorizer
             print("🔍 Falling back to TF-IDF...")
@@ -86,10 +102,29 @@ class EmbeddingBackend:
         except Exception as e:
             raise RuntimeError(f"No embedding backend available: {e}")
     
-    def encode(self, texts: List[str]) -> np.ndarray:
-        """Encode texts using the available backend."""
+    def encode(self, texts: List[str], is_query: bool = False) -> np.ndarray:
+        """Encode texts using the available backend.
         
-        if self.backend_name == "sentence-transformers":
+        Args:
+            texts: List of texts to encode
+            is_query: If True, use query prompt (for Qwen3)
+        """
+        
+        if self.backend_name == "qwen3":
+            # Qwen3 uses different prompts for queries vs documents
+            if is_query:
+                return self.backend.encode(
+                    texts,
+                    prompt_name="query",
+                    normalize_embeddings=True
+                )
+            else:
+                return self.backend.encode(
+                    texts,
+                    normalize_embeddings=True
+                )
+        
+        elif self.backend_name == "sentence-transformers":
             return self.backend.encode(texts)
         
         elif self.backend_name == "openai":
@@ -117,16 +152,25 @@ class EmbeddingBackend:
         info = {
             "backend": self.backend_name,
             "quality": {
-                "sentence-transformers": "Excellent (90-95%)",
+                "qwen3": "Excellent (92-96%)",
+                "sentence-transformers": "Very Good (87-92%)",
                 "openai": "Excellent (90-95%)",
                 "cohere": "Very Good (85-90%)",
                 "tfidf": "Good (75-80%)"
             }.get(self.backend_name, "Unknown"),
             "cost": {
+                "qwen3": "Free (local)",
                 "sentence-transformers": "Free (local)",
                 "openai": "$0.0001 per query",
                 "cohere": "$0.0001 per query",
                 "tfidf": "Free (local)"
+            }.get(self.backend_name, "Unknown"),
+            "size": {
+                "qwen3": "600 MB",
+                "sentence-transformers": "90 MB",
+                "openai": "API-based",
+                "cohere": "API-based",
+                "tfidf": "< 1 MB"
             }.get(self.backend_name, "Unknown")
         }
         return info
@@ -227,9 +271,9 @@ class SmartVectorStore:
             chunk['document'] = document_name
             self.chunks.append(chunk)
         
-        # Generate embeddings
+        # Generate embeddings (documents, not queries)
         all_texts = [c['text'] for c in self.chunks]
-        embeddings = self.embedding_backend.encode(all_texts)
+        embeddings = self.embedding_backend.encode(all_texts, is_query=False)
         
         if self.use_chromadb:
             # Use ChromaDB
@@ -257,7 +301,8 @@ class SmartVectorStore:
     
     def search(self, query: str, top_k: int = 5) -> List[Dict]:
         """Search for relevant chunks."""
-        query_embedding = self.embedding_backend.encode([query])[0]
+        # Use query prompt for better retrieval (Qwen3 feature)
+        query_embedding = self.embedding_backend.encode([query], is_query=True)[0]
         
         if self.use_chromadb:
             results = self.collection.query(
@@ -448,7 +493,8 @@ def interactive_mode(agent):
                 print(f"\n🔧 Embedding Backend:")
                 print(f"   Type: {info['backend']}")
                 print(f"   Quality: {info['quality']}")
-                print(f"   Cost: {info['cost']}\n")
+                print(f"   Cost: {info['cost']}")
+                print(f"   Size: {info['size']}\n")
                 continue
             
             if question.lower() == "stats":
